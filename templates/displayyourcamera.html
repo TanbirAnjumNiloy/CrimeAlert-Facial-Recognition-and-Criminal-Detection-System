@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Display Your Camera</title>
+</head>
+<body>
+    <h1>Face Detection</h1>
+    <video id="video" width="640" height="480" autoplay></video>
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
+    <div id="result"></div>
+
+    <script>
+        const video = document.getElementById('video');
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(err => {
+                console.error('Error accessing webcam: ' + err);
+            });
+
+        video.addEventListener('play', () => {
+            const canvas = document.getElementById('canvas');
+            const context = canvas.getContext('2d');
+
+            setInterval(() => {
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const dataURL = canvas.toDataURL('image/jpeg');
+
+                fetch('/process_frame/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({ image: dataURL })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.match) {
+                        document.getElementById('result').innerHTML = `
+                            <h2>Match Found</h2>
+                            <p>Name: ${data.name}</p>
+                            <p>Details: ${data.details}</p>
+                        `;
+                    } else {
+                        document.getElementById('result').innerHTML = `
+                            <h2>No Match Found</h2>
+                        `;
+                    }
+                })
+                .catch(err => console.error('Error processing frame: ' + err));
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
